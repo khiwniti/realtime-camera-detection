@@ -46,10 +46,11 @@ const ARCH_NODES: ArchNode[] = [
     icon: Layers,
     title: "Video Sources",
     color: "#f59e0b",
-    description: "Pluggable source adapter: webcam stream or remote video URL.",
+    description: "Pluggable adapter: webcam, live municipal CCTV (HLS), or custom stream.",
     details: [
       "getUserMedia() for live webcam",
-      "MP4 / WebM via <video> src binding",
+      "hls.js integration for live .m3u8 CCTV streams (Udon City, Thailand)",
+      "Native MP4 / WebM video fallback",
       "Custom URL input for any CORS-enabled stream",
       "Canvas overlay scaled to displayed video size",
     ],

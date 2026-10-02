@@ -5,6 +5,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 // via dynamic import to keep initial JS bundle paint-blocking free. The module
 // paths are literals, but load must happen after user gesture — static import
 // would block hydration for all visitors, even those who never start detection.
+import Hls from "hls.js";
 import type { ObjectDetection } from "@tensorflow-models/coco-ssd";
 import type { Detection, DetectionStats, ModelStatus, VideoSource } from "@/types";
 import { drawDetections, computeStats } from "@/lib/renderer";
@@ -12,11 +13,13 @@ import { DETECTION_INTERVAL_MS, MIN_CONFIDENCE } from "@/lib/constants";
 
 /**
  * Core hook: loads COCO-SSD model, manages video source binding,
+ * handles both native MP4/WebM and HLS (.m3u8) live CCTV feeds,
  * runs the detection loop, and renders overlays.
  *
  * Design decisions:
  * - TensorFlow.js + COCO-SSD loaded dynamically (code-split) to avoid
  *   blocking initial paint (~4 MB WASM + model weights).
+ * - hls.js dynamically loaded only when an .m3u8 stream is active.
  * - requestAnimationFrame-gated loop prevents backpressure when inference
  *   is slower than frame rate.
  * - All inference runs on the browser's WebGL/WASM backend — zero server cost.
@@ -25,6 +28,7 @@ export function useDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const modelRef = useRef<ObjectDetection | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const rafRef = useRef<number>(0);
   const activeRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -54,7 +58,6 @@ export function useDetector() {
     setModelStatus("loading");
     setError(null);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const tf = await import("@tensorflow/tfjs"); // deferred — see top comment
       await tf.ready(); // Prefer WebGL, fall back to WASM, then CPU
       const cocoSsd = await import("@tensorflow-models/coco-ssd"); // deferred — see top comment
@@ -78,6 +81,14 @@ export function useDetector() {
     }
   }, []);
 
+  /** Destroy active HLS instance. */
+  const destroyHls = useCallback(() => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+  }, []);
+
   /** Stop the detection loop and clear all state. */
   const stopDetection = useCallback(() => {
     activeRef.current = false;
@@ -86,9 +97,11 @@ export function useDetector() {
       rafRef.current = 0;
     }
     stopStream();
+    destroyHls();
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current.src = "";
+      videoRef.current.removeAttribute("src");
       videoRef.current.load();
     }
     setActiveSource(null);
@@ -97,7 +110,7 @@ export function useDetector() {
       const ctx = canvasRef.current.getContext("2d");
       if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
-  }, [stopStream]);
+  }, [stopStream, destroyHls]);
 
   /** Run one detection frame, then schedule the next via rAF + timeout. */
   const detectFrame = useCallback(async () => {
@@ -124,8 +137,8 @@ export function useDetector() {
       canvas.height = displayH;
     }
 
-    const scaleX = displayW / video.videoWidth;
-    const scaleY = displayH / video.videoHeight;
+    const scaleX = displayW / (video.videoWidth || displayW);
+    const scaleY = displayH / (video.videoHeight || displayH);
 
     const t0 = performance.now();
     try {
@@ -185,14 +198,53 @@ export function useDetector() {
           });
           streamRef.current = stream;
           video.srcObject = stream;
+          await video.play();
         } else if (source.url) {
-          video.src = source.url;
-          video.crossOrigin = "anonymous";
-          video.loop = true;
-          video.muted = true;
+          const isHls = source.url.includes(".m3u8");
+
+          if (isHls) {
+            if (Hls.isSupported()) {
+              const hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                backBufferLength: 30,
+              });
+              hlsRef.current = hls;
+
+              await new Promise<void>((resolve, reject) => {
+                hls.loadSource(source.url!);
+                hls.attachMedia(video);
+
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                  video
+                    .play()
+                    .then(() => resolve())
+                    .catch(reject);
+                });
+
+                hls.on(Hls.Events.ERROR, (_event, data) => {
+                  if (data.fatal) {
+                    reject(new Error(`HLS error: ${data.details || data.type}`));
+                  }
+                });
+              });
+            } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+              // Safari native HLS
+              video.src = source.url;
+              await video.play();
+            } else {
+              throw new Error("HLS is not supported in this browser");
+            }
+          } else {
+            // Standard MP4/WebM video
+            video.src = source.url;
+            video.crossOrigin = "anonymous";
+            video.loop = true;
+            video.muted = true;
+            await video.play();
+          }
         }
 
-        await video.play();
         activeRef.current = true;
         setActiveSource(source);
         fpsFrames.current = 0;
@@ -204,7 +256,7 @@ export function useDetector() {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to start video source. Check camera permissions.",
+            : "Failed to start video source. Check camera permissions or stream availability.",
         );
         stopDetection();
       }
@@ -218,8 +270,9 @@ export function useDetector() {
       activeRef.current = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       stopStream();
+      destroyHls();
     };
-  }, [stopStream]);
+  }, [stopStream, destroyHls]);
 
   return {
     videoRef,
