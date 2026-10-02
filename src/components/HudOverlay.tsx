@@ -2,6 +2,7 @@
 
 import type { DetectionStats } from "@/types";
 import { classColor } from "@/lib/constants";
+import type { LucideIcon } from "lucide-react";
 import { Activity, Target, Zap } from "lucide-react";
 
 interface HudOverlayProps {
@@ -99,7 +100,7 @@ function MetricPill({
   color,
   good,
 }: {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   label: string;
   value: string;
   color: string;
@@ -114,7 +115,7 @@ function MetricPill({
         boxShadow: `0 0 12px -3px ${color}33`,
       }}
     >
-      <Icon size={13} style={{ color }} />
+      <Icon size={13} color={color} />
       <span className="font-bold tracking-tight" style={{ color }}>
         {value}
       </span>
