@@ -1,7 +1,7 @@
 "use client";
 
 import type { ModelStatus } from "@/types";
-import { Loader2, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Loader2, CheckCircle2, AlertOctagon, Radio } from "lucide-react";
 
 interface ModelStatusBadgeProps {
   status: ModelStatus;
@@ -9,39 +9,53 @@ interface ModelStatusBadgeProps {
 
 const STATUS_CONFIG: Record<
   ModelStatus,
-  { label: string; color: string; Icon: React.ComponentType<{ size?: number; className?: string }> }
+  { label: string; dotClass: string; textColor: string; Icon: React.ComponentType<{ size?: number; className?: string }> }
 > = {
   idle: {
-    label: "Select a source to begin",
-    color: "text-slate-400",
-    Icon: Info,
+    label: "ENGINE READY",
+    dotClass: "bg-slate-400",
+    textColor: "text-slate-400",
+    Icon: Radio,
   },
   loading: {
-    label: "Loading model…",
-    color: "text-blue-400",
+    label: "WARMING ENGINE...",
+    dotClass: "bg-cyan-400",
+    textColor: "text-cyan-400",
     Icon: Loader2,
   },
   ready: {
-    label: "Model ready",
-    color: "text-green-400",
+    label: "INFERENCE ACTIVE",
+    dotClass: "bg-emerald-400",
+    textColor: "text-emerald-400",
     Icon: CheckCircle2,
   },
   error: {
-    label: "Model failed to load",
-    color: "text-red-400",
-    Icon: XCircle,
+    label: "ENGINE FAULT",
+    dotClass: "bg-rose-400",
+    textColor: "text-rose-400",
+    Icon: AlertOctagon,
   },
 };
 
 export function ModelStatusBadge({ status }: ModelStatusBadgeProps) {
-  const { label, color, Icon } = STATUS_CONFIG[status];
+  const { label, dotClass, textColor, Icon } = STATUS_CONFIG[status];
+
   return (
-    <div className={`flex items-center gap-1.5 text-xs font-medium ${color}`}>
-      <Icon
-        size={14}
-        className={status === "loading" ? "animate-spin" : ""}
-      />
-      {label}
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
+      <span className="relative flex h-2 w-2">
+        {status === "ready" && (
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${dotClass} opacity-75`} />
+        )}
+        <span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`} />
+      </span>
+
+      <span className={`text-[10px] font-mono font-bold tracking-wider ${textColor}`}>
+        {label}
+      </span>
+
+      {status === "loading" && (
+        <Loader2 size={12} className="animate-spin text-cyan-400" />
+      )}
     </div>
   );
 }
