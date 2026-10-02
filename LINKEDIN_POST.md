@@ -41,7 +41,7 @@ The whole thing fits in one page. The architecture panel in the app explains eve
 ---
 
 🔗 Live demo: [your-vercel-url.vercel.app]
-💻 Code: [github.com/khiwniti/realtime-camera-detection]
+💻 Code: https://github.com/khiwniti/realtime-camera-detection
 
 ---
 
