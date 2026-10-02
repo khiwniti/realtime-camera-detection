@@ -1,5 +1,6 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import { X, ChevronRight, Layers, Cpu, Globe, Zap, Shield, RefreshCw } from "lucide-react";
 
 interface ArchSidebarProps {
@@ -8,7 +9,7 @@ interface ArchSidebarProps {
 }
 
 interface ArchNode {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   title: string;
   color: string;
   description: string;
@@ -162,7 +163,7 @@ export function ArchSidebar({ open, onClose }: ArchSidebarProps) {
                     className="flex items-center justify-center w-8 h-8 rounded-lg"
                     style={{ backgroundColor: `${node.color}22`, border: `1px solid ${node.color}44` }}
                   >
-                    <Icon size={16} style={{ color: node.color }} />
+                    <Icon size={16} color={node.color} />
                   </div>
                   <div className="flex items-center gap-2">
                     {idx < ARCH_NODES.length - 1 && (
@@ -183,7 +184,7 @@ export function ArchSidebar({ open, onClose }: ArchSidebarProps) {
                       <ChevronRight
                         size={12}
                         className="mt-0.5 shrink-0"
-                        style={{ color: node.color }}
+                        color={node.color}
                       />
                       <span>{detail}</span>
                     </li>
